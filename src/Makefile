@@ -1,0 +1,69 @@
+# requires the proto folder to be completely setup
+
+RISCV_PREFIX=riscv64-unknown-linux-gnu
+CXX=$(RISCV_PREFIX)-g++
+
+ROOT_DIR:=$(shell dirname $(realpath $(firstword $(MAKEFILE_LIST))))
+
+CXXFLAGS=-std=c++11 -O3 -g3 -static -pthread -D NDEBUG
+
+########## PROTO ##########
+
+PROTO_ACC_DIR=$(ROOT_DIR)/../../hyperscale-soc-chipyard/generators/protoacc
+
+PROTO_CXX_SRCS = \
+	$(PROTO_ACC_DIR)/microbenchmarks/accellib.cpp \
+	$(PROTO_ACC_DIR)/microbenchmarks/primitive-tests-serializer/primitives.pb.cc
+
+PROTO_CXX_HDRS = \
+	$(PROTO_ACC_DIR)/microbenchmarks/accellib.h \
+	$(PROTO_ACC_DIR)/microbenchmarks/primitive-tests-serializer/primitives.pb.h
+
+PROTO_CXX_ALL = $(PROTO_CXX_SRCS) $(PROTO_CXX_HDRS)
+
+PROTO_LIB = $(PROTO_ACC_DIR)/microbenchmarks/protobuf-riscv-install/lib/libprotobuf.a
+PROTO_LIB_HDR_DIR = $(PROTO_ACC_DIR)/microbenchmarks/protobuf-riscv-install/include
+
+########## SHA ##########
+
+SHA_DIR=$(ROOT_DIR)/../../hyperscale-soc-chipyard/generators/sha3
+
+SHA_CXX_HDRS = \
+	$(SHA_DIR)/software/tests/src/compiler.h \
+	$(SHA_DIR)/software/tests/src/sha3.h
+
+SHA_CXX_ALL = $(SHA_CXX_SRCS) $(SHA_CXX_HDRS)
+
+########## ROCC ##########
+
+# use this as the single src of truth rocc.h
+ROCC_CXX_HDRS = \
+	$(PROTO_ACC_DIR)/microbenchmarks/rocc.h
+
+########## MISC ##########
+
+# use this as the single src of truth encoding.h
+MISC_CXX_HDRS = \
+	$(SHA_DIR)/software/tests/src/encoding.h
+
+PROTO_HDR_DIRS += $(sort $(foreach filename,$(PROTO_CXX_HDRS),$(dir $(filename))))
+SHA_HDR_DIRS += $(sort $(foreach filename,$(SHA_CXX_HDRS),$(dir $(filename))))
+ROCC_HDR_DIRS += $(sort $(foreach filename,$(ROCC_CXX_HDRS),$(dir $(filename))))
+MISC_HDR_DIRS += $(sort $(foreach filename,$(MISC_CXX_HDRS),$(dir $(filename))))
+CXXFLAGS += \
+	$(foreach dirname,$(PROTO_HDR_DIRS),-I $(dirname)) \
+	$(foreach dirname,$(SHA_HDR_DIRS),-I $(dirname)) \
+	$(foreach dirname,$(ROCC_HDR_DIRS),-I $(dirname)) \
+	$(foreach dirname,$(MISC_HDR_DIRS),-I $(dirname)) \
+	-I $(PROTO_LIB_HDR_DIR)
+
+TESTS=multithreaded-test proto-sha3-serialized proto-sha3-serialized-2 proto-sha3-chained
+COMPILED_TESTS=$(addsuffix .riscv,$(TESTS))
+
+default: $(COMPILED_TESTS)
+
+%.riscv: %.cpp $(PROTO_CXX_ALL) $(SHA_CXX_ALL) $(ROCC_CXX_HDRS)
+	$(CXX) $(CXXFLAGS) $< $(PROTO_CXX_SRCS) $(PROTO_LIB) -pthread -o $@
+
+clean:
+	rm -rf $(COMPILED_TESTS)

@@ -1,0 +1,9 @@
+{
+  "name" : "proto-sha3-serialized",
+  "base" : "br-base.json",
+  "workdir" : ".",
+  "host-init" : "build.sh",
+  "overlay" : "overlay",
+  "command" : "./proto-sha3-serialized-2.riscv",
+  "cpus" : 1,
+}
