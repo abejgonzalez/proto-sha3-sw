@@ -43,13 +43,13 @@ int stick_this_thread_to_core(int core_id) {
 }
 
 void* op_core0(void* arg) {
-    stick_this_thread_to_core(0);
-    printf("Core 0: Proto Serialization Working\n");
+    stick_this_thread_to_core(PROTO_CID);
+    printf("Proto Thread: Working on %d\n", PROTO_CID);
     unsigned int cpu, node, rc;
     if (rc = getcpu(&cpu, &node)) {
-        printf("0: getcpu failed with rc=%d\n", rc);
+        printf("PRO: getcpu failed with rc=%d\n", rc);
     }
-    printf("0: CPU=%d Node=%d\n", cpu, node);
+    printf("PRO: CPU=%d Node=%d\n", cpu, node);
 
     unsigned long setup_start, setup_end;
     unsigned long s_start[NUM_ITERS];
@@ -77,15 +77,9 @@ void* op_core0(void* arg) {
     const char* cpu_out_str_ptrs[NUM_ITERS];
     ser_out_str_ptrs = (volatile char**)(&cpu_out_str_ptrs);
 
-    printf("0: CPUInit: ser_out_str_ptrs:%p cpu_out_str_ptrs:%p\n", ser_out_str_ptrs, &cpu_out_str_ptrs);
+    printf("PRO: CPUInit: ser_out_str_ptrs:%p cpu_out_str_ptrs:%p\n", ser_out_str_ptrs, &cpu_out_str_ptrs);
 #endif
     setup_end = rdcycle();
-
-    pthread_mutex_lock(&lock);
-    ser_inited = true;
-    pthread_cond_signal(&cond);
-    pthread_mutex_unlock(&lock);
-    printf("0: Passed cond signal\n");
 
     for (int i = 0; i < NUM_ITERS; i++){
         s_start[i] = rdcycle();
@@ -94,18 +88,18 @@ void* op_core0(void* arg) {
         //BlockOnSerializedValue(ser_out_str_ptrs, i);
 #else
         for (int j = 0; j < NUM_ITERS; j++) {
-            printf("0: ser_out_str_ptrs[%d]:%p cpu_out_str_ptrs[%d]:%p\n", ser_out_str_ptrs[i], cpu_out_str_ptrs[i]);
+            printf("PRO: ser_out_str_ptrs[%d]:%p cpu_out_str_ptrs[%d]:%p\n", ser_out_str_ptrs[i], cpu_out_str_ptrs[i]);
         }
-        printf("0: out_strs[%d].length:%d cpu_out_str_ptrs[%d]:%p\n",
+        printf("PRO: out_strs[%d].length:%d cpu_out_str_ptrs[%d]:%p\n",
                 i,
                 out_strs[i].length(),
                 i,
                 cpu_out_str_ptrs[i]
                 );
-        printf("0: -> Proto serialize\n");
+        printf("PRO: -> Proto serialize\n");
         proto_objs[i]->SerializeToString(&out_strs[i]);
         cpu_out_str_ptrs[i] = out_strs[i].c_str();
-        printf("0: out_strs[%d].length:%d cpu_out_str_ptrs[%d](.length,val):%d,%p\n",
+        printf("PRO: out_strs[%d].length:%d cpu_out_str_ptrs[%d](.length,val):%d,%p\n",
                 i,
                 out_strs[i].length(),
                 i,
@@ -113,7 +107,7 @@ void* op_core0(void* arg) {
                 cpu_out_str_ptrs[i]
                 );
         for (int j = 0; j < strlen(cpu_out_str_ptrs[i]); j++) {
-            printf("0: cpu_out_str_ptrs[%d][%d]:0x%x\n",
+            printf("PRO: cpu_out_str_ptrs[%d][%d]:0x%x\n",
                     i,
                     j,
                     cpu_out_str_ptrs[i][j]
@@ -125,32 +119,38 @@ void* op_core0(void* arg) {
 
     google::protobuf::ShutdownProtobufLibrary();
 
+    pthread_mutex_lock(&lock);
+    ser_inited = true;
+    pthread_cond_signal(&cond);
+    pthread_mutex_unlock(&lock);
+    printf("PRO: Passed cond signal\n");
+
     // Wait for SHA3 to finish before exiting out of this thread (to prevent mem. dealloc)
     pthread_mutex_lock(&lock);
     while (!sha_finished) {
-    //    //printf("0: sha_finished:%d\n", sha_finished);
+    //    //printf("PRO: sha_finished:%d\n", sha_finished);
     //    //sleep(1);
         pthread_cond_wait(&cond, &lock);
     }
     pthread_mutex_unlock(&lock);
 
-    printf("0: Setup=%d\n", setup_end - setup_start);
+    printf("PRO: Setup=%d\n", setup_end - setup_start);
     for (int i = 0; i < NUM_ITERS; i++) {
-        printf("0: Iter %d: Proto=%d\n", i, (s_end[i] - s_start[i]));
+        printf("PRO: Iter %d: Proto=%d\n", i, (s_end[i] - s_start[i]));
     }
-    printf("0: SetupStart=%ld\n", setup_start);
+    printf("PRO: SetupStart=%ld\n", setup_start);
 
     return 0;
 }
 
 void* op_core1(void* arg) {
-    stick_this_thread_to_core(1);
-    printf("Core 1: Working\n");
+    stick_this_thread_to_core(SHA3_CID);
+    printf("SHA3 Thread: Working on %d\n", SHA3_CID);
     unsigned int cpu, node, rc;
     if (rc = getcpu(&cpu, &node)) {
-        printf("1: getcpu failed with rc=%d\n", rc);
+        printf("SHA3: getcpu failed with rc=%d\n", rc);
     }
-    printf("1: CPU=%d Node=%d\n", cpu, node);
+    printf("SHA3: CPU=%d Node=%d\n", cpu, node);
 
     // Setup SHA3 output
     unsigned char sha3_output[NUM_ITERS][SHA3_256_DIGEST_SIZE] __aligned(8);
@@ -161,12 +161,12 @@ void* op_core1(void* arg) {
 
     pthread_mutex_lock(&lock);
     while (!ser_inited) {
-    //    printf("1: ser_inited:%d\n", ser_inited);
+    //    printf("SHA3: ser_inited:%d\n", ser_inited);
     //    sleep(1);
         pthread_cond_wait(&cond, &lock);
     }
     pthread_mutex_unlock(&lock);
-    printf("1: ser_out_str_ptrs:%p\n", ser_out_str_ptrs);
+    printf("SHA3: ser_out_str_ptrs:%p\n", ser_out_str_ptrs);
 
     for (int i = 0; i < NUM_ITERS; i++){
         sha_start[i] = rdcycle();
@@ -174,7 +174,7 @@ void* op_core1(void* arg) {
         // wait for ith iter of proto ser to finish
         while(ser_out_str_ptrs[i] == 0) {
             //for (int j = 0; j < NUM_ITERS; j++) {
-            //    printf("1: ser_out_str_ptrs[%d]:%p\n", ser_out_str_ptrs[j]);
+            //    printf("SHA3: ser_out_str_ptrs[%d]:%p\n", ser_out_str_ptrs[j]);
             //}
             //sleep(1);
         }
@@ -192,17 +192,17 @@ void* op_core1(void* arg) {
         ROCC_INSTRUCTION_S(2, strlen((const char*)ser_out_str_ptrs[i]), 1);
         asm volatile ("fence" ::: "memory");
 #else
-        printf("1: ser_out_str_ptrs[%d](.length,val):%d,%p sha3_output[%d]:%p\n",
+        printf("SHA3: ser_out_str_ptrs[%d](.length,val):%d,%p sha3_output[%d]:%p\n",
                 i,
                 strlen((const char*)ser_out_str_ptrs[i]),
                 ser_out_str_ptrs[i],
                 i,
                 sha3_output[i]
                 );
-        printf("1: --> SHA3 hash\n");
+        printf("SHA3: --> SHA3 hash\n");
         sha3ONE((unsigned char*)ser_out_str_ptrs[i], strlen((const char*)ser_out_str_ptrs[i]), sha3_output[i]);
         for (int j = 0; j < SHA3_256_DIGEST_SIZE; j++) {
-            printf("1: sha3_output[%d][%d]:0x%x\n",
+            printf("SHA3: sha3_output[%d][%d]:0x%x\n",
                     i,
                     j,
                     sha3_output[i][j]
@@ -218,9 +218,9 @@ void* op_core1(void* arg) {
     pthread_mutex_unlock(&lock);
 
     for (int i = 0; i < NUM_ITERS; i++) {
-        printf("1: Iter %d: SHAFull=%d SHACore=%d\n", i, (sha_end[i] - sha_start[i]), (sha_end[i] - sha_mid[i]));
+        printf("SHA3: Iter %d: SHAFull=%d SHACore=%d\n", i, (sha_end[i] - sha_start[i]), (sha_end[i] - sha_mid[i]));
     }
-    printf("1: Last SHA counter: %ld\n", sha_end[NUM_ITERS - 1]);
+    printf("SHA3: Last SHA counter: %ld\n", sha_end[NUM_ITERS - 1]);
 
     return 0;
 }

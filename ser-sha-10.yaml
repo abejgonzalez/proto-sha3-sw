@@ -1,0 +1,9 @@
+{
+  "name" : "ser-sha-10",
+  "base" : "br-base.json",
+  "workdir" : ".",
+  "host-init" : "build.sh -acc-proto -acc-sha3 -proto-cid 1 -sha3-cid 0",
+  "overlay" : "overlay",
+  "command" : "./proto-sha3-serialized-threads.riscv",
+  "cpus" : 1,
+}

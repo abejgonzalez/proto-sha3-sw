@@ -5,11 +5,13 @@ CXX=$(RISCV_PREFIX)-g++
 
 ROOT_DIR:=$(shell dirname $(realpath $(firstword $(MAKEFILE_LIST))))
 
-CXXFLAGS=-std=c++11 -O3 -g3 -static -pthread -D NDEBUG
+CXXFLAGS=-std=c++11 -O3 -g3 -static -pthread -D NDEBUG $(EXTRA_CXXFLAGS)
+
+HYPERSCALE_REPO=$(ROOT_DIR)/../../hyperscale-soc-chipyard
 
 ########## PROTO ##########
 
-PROTO_ACC_DIR=$(ROOT_DIR)/../../hyperscale-soc-chipyard/generators/protoacc
+PROTO_ACC_DIR=$(HYPERSCALE_REPO)/generators/protoacc
 
 PROTO_CXX_SRCS = \
 	$(PROTO_ACC_DIR)/microbenchmarks/accellib.cpp \
@@ -26,7 +28,7 @@ PROTO_LIB_HDR_DIR = $(PROTO_ACC_DIR)/microbenchmarks/protobuf-riscv-install/incl
 
 ########## SHA ##########
 
-SHA_DIR=$(ROOT_DIR)/../../hyperscale-soc-chipyard/generators/sha3
+SHA_DIR=$(HYPERSCALE_REPO)/generators/sha3
 
 SHA_CXX_HDRS = \
 	$(SHA_DIR)/software/tests/src/compiler.h \
@@ -57,7 +59,8 @@ CXXFLAGS += \
 	$(foreach dirname,$(MISC_HDR_DIRS),-I $(dirname)) \
 	-I $(PROTO_LIB_HDR_DIR)
 
-TESTS=multithreaded-test proto-sha3-serialized proto-sha3-serialized-2 proto-sha3-chained
+#TESTS=multithreaded-test proto-sha3-serialized proto-sha3-serialized-2 proto-sha3-chained
+TESTS=proto-sha3-serialized-threads proto-sha3-serialized-2 proto-sha3-chained
 COMPILED_TESTS=$(addsuffix .riscv,$(TESTS))
 
 default: $(COMPILED_TESTS)
