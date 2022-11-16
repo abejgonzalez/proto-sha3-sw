@@ -71,6 +71,8 @@ void* op_core0(void* arg) {
 #ifdef PROTO_ACCEL
     // Setup str, and strptr memory regions (also touches all pages to avoid accel. pg. faults)
     ser_out_str_ptrs = AccelSetupSerializer();
+
+    printf("PRO: ProtoInit: ser_out_str_ptrs:%p\n", ser_out_str_ptrs);
 #else
     // Setup output area for objs
     std::string out_strs[NUM_ITERS];
@@ -84,11 +86,20 @@ void* op_core0(void* arg) {
     for (int i = 0; i < NUM_ITERS; i++){
         s_start[i] = rdcycle();
 #ifdef PROTO_ACCEL
+        for (int j = 0; j < NUM_ITERS; j++) {
+            printf("PRO: ser_out_str_ptrs[%d]:%p\n", i, ser_out_str_ptrs[i]);
+        }
+        printf("PRO: -> Proto serialize\n");
+
         AccelSerializeToString(primitivetests, Paccser_boolMessage, proto_objs[i]);
-        //BlockOnSerializedValue(ser_out_str_ptrs, i);
+        BlockOnSerializedValue(ser_out_str_ptrs, i);
+
+        for (int j = 0; j < NUM_ITERS; j++) {
+            printf("PRO: ser_out_str_ptrs[%d]:%p\n", i, ser_out_str_ptrs[i]);
+        }
 #else
         for (int j = 0; j < NUM_ITERS; j++) {
-            printf("PRO: ser_out_str_ptrs[%d]:%p cpu_out_str_ptrs[%d]:%p\n", ser_out_str_ptrs[i], cpu_out_str_ptrs[i]);
+            printf("PRO: ser_out_str_ptrs[%d]:%p cpu_out_str_ptrs[%d]:%p\n", i, ser_out_str_ptrs[i], i, cpu_out_str_ptrs[i]);
         }
         printf("PRO: out_strs[%d].length:%d cpu_out_str_ptrs[%d]:%p\n",
                 i,
@@ -171,16 +182,17 @@ void* op_core1(void* arg) {
     for (int i = 0; i < NUM_ITERS; i++){
         sha_start[i] = rdcycle();
 
-        // wait for ith iter of proto ser to finish
-        while(ser_out_str_ptrs[i] == 0) {
-            //for (int j = 0; j < NUM_ITERS; j++) {
-            //    printf("SHA3: ser_out_str_ptrs[%d]:%p\n", ser_out_str_ptrs[j]);
-            //}
-            //sleep(1);
-        }
-
         sha_mid[i] = rdcycle();
 #ifdef SHA3_ACCEL
+        printf("SHA3: ser_out_str_ptrs[%d](.length,val):%d,%p sha3_output[%d]:%p\n",
+                i,
+                strlen((const char*)ser_out_str_ptrs[i]),
+                ser_out_str_ptrs[i],
+                i,
+                sha3_output[i]
+                );
+        printf("SHA3: --> SHA3 hash\n");
+
         // Compute hash with accelerator
         asm volatile ("fence");
         // Invoke the acclerator and check responses
@@ -191,6 +203,14 @@ void* op_core1(void* arg) {
         // Set length and compute hash
         ROCC_INSTRUCTION_S(2, strlen((const char*)ser_out_str_ptrs[i]), 1);
         asm volatile ("fence" ::: "memory");
+
+        for (int j = 0; j < SHA3_256_DIGEST_SIZE; j++) {
+            printf("SHA3: sha3_output[%d][%d]:0x%x\n",
+                    i,
+                    j,
+                    sha3_output[i][j]
+                    );
+        }
 #else
         printf("SHA3: ser_out_str_ptrs[%d](.length,val):%d,%p sha3_output[%d]:%p\n",
                 i,
