@@ -3,7 +3,7 @@
   "base" : "br-base.json",
   "workdir" : ".",
   "overlay" : "overlay-all",
-  "host-init" : "build-all.sh -proto-cid 1 -sha3-cid 0",
+  "host-init" : "build-all.sh -proto-cid 1 -sha3-cid 2",
   "cpus" : "3",
   "jobs" : [
     {

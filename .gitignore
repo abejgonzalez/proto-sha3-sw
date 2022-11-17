@@ -1,3 +1,5 @@
 .*.swp
 overlay/
+overlay-all/
 *.pid
+*.riscv

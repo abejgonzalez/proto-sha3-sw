@@ -23,6 +23,8 @@ do
     shift
 done
 
+echo "Assigning PROTO->$PROTO_CID SHA->$SHA3_CID"
+
 EXTRA_CXXFLAGS="-DPROTO_CID=${PROTO_CID} -DSHA3_CID=${SHA3_CID}"
 
 echo "Removing old overlay"
@@ -44,7 +46,8 @@ cp proto-sha3-chained.riscv ../overlay-all/ss-10-chained-all-cpu.riscv
 
 echo "Build ss-10-*-all-accel.riscv"
 $MAKE clean
-$MAKE EXTRA_CXXFLAGS="${EXTRA_CXXFLAGS} -DPROTO_ACCEL -DSHA3_ACCEL" \
+#$MAKE EXTRA_CXXFLAGS="${EXTRA_CXXFLAGS} -DPROTO_ACCEL -DSHA3_ACCEL" \
+$MAKE EXTRA_CXXFLAGS="${EXTRA_CXXFLAGS} -DSHA3_ACCEL" \
     proto-sha3-serialized-threads.riscv \
     proto-sha3-chained.riscv
 
