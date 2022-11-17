@@ -1,0 +1,10 @@
+{
+  "name" : "old",
+  "base" : "br-base.json",
+  "workdir" : ".",
+  "command" : "./ser_bool.riscv",
+  "files" : [
+    ["/home/centos/firesim-protoacc-ae/target-design/chipyard/generators/protoacc/microbenchmarks/primitive-tests-serializer/ser_bool.riscv", "/ser_bool.riscv"]
+  ],
+  "cpus" : "1"
+}
