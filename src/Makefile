@@ -5,7 +5,7 @@ CXX=$(RISCV_PREFIX)-g++
 
 ROOT_DIR:=$(shell dirname $(realpath $(firstword $(MAKEFILE_LIST))))
 
-CXXFLAGS=-std=c++11 -O3 -g3 -static -pthread -D NDEBUG $(EXTRA_CXXFLAGS)
+CXXFLAGS=-std=c++11 -O3 -g3 -static -pthread -DDEBUG $(EXTRA_CXXFLAGS)
 
 HYPERSCALE_REPO=$(ROOT_DIR)/../../hyperscale-soc-chipyard
 
@@ -46,7 +46,8 @@ ROCC_CXX_HDRS = \
 
 # use this as the single src of truth encoding.h
 MISC_CXX_HDRS = \
-	$(SHA_DIR)/software/tests/src/encoding.h
+	$(SHA_DIR)/software/tests/src/encoding.h \
+	$(ROOT_DIR)/utils.h
 
 PROTO_HDR_DIRS += $(sort $(foreach filename,$(PROTO_CXX_HDRS),$(dir $(filename))))
 SHA_HDR_DIRS += $(sort $(foreach filename,$(SHA_CXX_HDRS),$(dir $(filename))))
