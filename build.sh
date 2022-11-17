@@ -1,6 +1,6 @@
 #!/bin/bash
 
-set -e
+set -ex
 
 USE_PROTO_ACCEL=false
 USE_SHA3_ACCEL=false
@@ -41,7 +41,8 @@ fi
 
 echo "Building srcs"
 cd src
-make EXTRA_CXXFLAGS="${EXTRA_CXXFLAGS}"
+make -f Makefile-old-proto-repo clean
+make -f Makefile-old-proto-repo EXTRA_CXXFLAGS="${EXTRA_CXXFLAGS}"
 cd ..
 
 echo "Removing old overlay"
