@@ -1,0 +1,18 @@
+{
+  "name" : "ss-all-hyper",
+  "base" : "br-base.json",
+  "workdir" : ".",
+  "overlay" : "overlay-all-hyper",
+  "host-init" : "build-all-hyper.sh",
+  "cpus" : "3",
+  "jobs" : [
+    {
+      "name" : "ss-serial-all-cpu",
+      "command" : "./run.sh ./ss-serial-all-cpu.riscv"
+    },
+    {
+      "name" : "ss-serial-all-accel",
+      "command" : "./run.sh ./ss-serial-all-accel.riscv"
+    }
+  ]
+}

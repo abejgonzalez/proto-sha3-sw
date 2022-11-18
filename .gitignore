@@ -1,5 +1,4 @@
 .*.swp
-overlay/
-overlay-all/
+overlay*/
 *.pid
 *.riscv
