@@ -27,7 +27,14 @@ bool sha_finished = false;
 pthread_cond_t cond = PTHREAD_COND_INITIALIZER;
 pthread_mutex_t lock = PTHREAD_MUTEX_INITIALIZER;
 
+typedef struct pin_args {
+    int cid;
+} pin_args_t;
+
 void* op_core0(void* arg) {
+    pin_args_t* args = (pin_args_t*)arg;
+    int PROTO_CID = args->cid;
+
     CHECK(stick_this_thread_to_core(PROTO_CID));
     CHECK(verify_cpu_pinned(PROTO_CID));
     DEBUG_PRINT("PRO: Working on %d\n", PROTO_CID);
@@ -152,6 +159,9 @@ void* op_core0(void* arg) {
 }
 
 void* op_core1(void* arg) {
+    pin_args_t* args = (pin_args_t*)arg;
+    int SHA3_CID = args->cid;
+
     CHECK(stick_this_thread_to_core(SHA3_CID));
     CHECK(verify_cpu_pinned(SHA3_CID));
     DEBUG_PRINT("SHA3: Working on %d\n", SHA3_CID);
@@ -172,6 +182,12 @@ void* op_core1(void* arg) {
     pthread_mutex_unlock(&lock);
     DEBUG_PRINT("SHA3: ser_out_str_ptrs:%p\n", ser_out_str_ptrs);
 
+    CHECK(verify_cpu_pinned(SHA3_CID));
+
+#ifdef SHA3_ACCEL
+    asm volatile (".insn r CUSTOM_2, 0, 2, zero, zero, zero");
+#endif
+
     for (int i = 0; i < NUM_ITERS; i++){
         sha_start[i] = rdcycle();
 
@@ -190,12 +206,17 @@ void* op_core1(void* arg) {
         asm volatile ("fence");
         // Invoke the acclerator and check responses
 
+        DEBUG_PRINT("SHA3: --> CP0\n");
+
         // setup accelerator with addresses of input and output
         ROCC_INSTRUCTION_SS(2, &ser_out_str_ptrs[i], &sha3_output[i], 0);
+        DEBUG_PRINT("SHA3: --> CP1\n");
 
         // Set length and compute hash
         ROCC_INSTRUCTION_S(2, strlen((const char*)ser_out_str_ptrs[i]), 1);
+        DEBUG_PRINT("SHA3: --> CP2\n");
         asm volatile ("fence" ::: "memory");
+        DEBUG_PRINT("SHA3: --> CP3\n");
 
         for (int j = 0; j < SHA3_256_DIGEST_SIZE; j++) {
             DEBUG_PRINT("SHA3: sha3_output[%d][%d]:0x%x\n",
@@ -238,8 +259,18 @@ void* op_core1(void* arg) {
     return 0;
 }
 
-int main() {
+int main(int argc, char* argv[]) {
     DEBUG_PRINT("Starting test!\n\n");
+
+    if (argc != 3) {
+        fprintf(stderr, "invalid # args: %s PROTO_CID SHA3_CID\n", argv[0]);
+        exit(1);
+    }
+
+    pin_args_t tid0_pin_args;
+    tid0_pin_args.cid = std::stoi(argv[1]);
+    pin_args_t tid1_pin_args;
+    tid1_pin_args.cid = std::stoi(argv[2]);
 
     // Ensure all pages are resident to avoid accelerator page faults
     if (mlockall(MCL_CURRENT | MCL_FUTURE)) {
@@ -250,11 +281,11 @@ int main() {
     int rc1, rc2;
     pthread_t tid0, tid1;
 
-    if(rc1=pthread_create(&tid0, NULL, &op_core0, NULL)) {
+    if(rc1=pthread_create(&tid0, NULL, &op_core0, &tid0_pin_args)) {
        DEBUG_PRINT("Thread 0 creation failed: %d\n", rc1);
     }
 
-    if(rc2=pthread_create(&tid1, NULL, &op_core1, NULL)) {
+    if(rc2=pthread_create(&tid1, NULL, &op_core1, &tid1_pin_args)) {
        DEBUG_PRINT("Thread 1 creation failed: %d\n", rc2);
     }
 

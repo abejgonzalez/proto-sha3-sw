@@ -3,24 +3,12 @@
   "base" : "br-base.json",
   "workdir" : ".",
   "overlay" : "overlay-all",
-  "host-init" : "build-all.sh -proto-cid 1 -sha3-cid 2",
+  "host-init" : "build-all.sh",
   "cpus" : "3",
   "jobs" : [
     {
-      "name" : "ss-10-chained-all-cpu",
-      "command" : "./ss-10-chained-all-cpu.riscv"
-    },
-    {
-      "name" : "ss-10-chained-all-accel",
-      "command" : "./ss-10-chained-all-accel.riscv"
-    },
-    {
-      "name" : "ss-10-serial-all-cpu",
-      "command" : "./ss-10-serial-all-cpu.riscv"
-    },
-    {
-      "name" : "ss-10-serial-all-accel",
-      "command" : "./ss-10-serial-all-accel.riscv"
+      "name" : "ss-serial-all-accel",
+      "command" : "./run.sh ./ss-serial-all-accel.riscv"
     }
   ]
 }

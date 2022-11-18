@@ -2,56 +2,34 @@
 
 set -ex
 
-# core ids
-PROTO_CID=1
-SHA3_CID=2
-
-# getopts does not support long options, and is inflexible
-while [ "$1" != "" ];
-do
-    case $1 in
-        -proto-cid)
-            shift
-            PROTO_CID=$1 ;;
-        -sha3-cid)
-            shift
-            SHA3_CID=$1 ;;
-        * )
-            error "invalid option $1"
-            exit 1 ;;
-    esac
-    shift
-done
-
-echo "Assigning PROTO->$PROTO_CID SHA->$SHA3_CID"
-
-EXTRA_CXXFLAGS="-DPROTO_CID=${PROTO_CID} -DSHA3_CID=${SHA3_CID}"
-
 echo "Removing old overlay"
 rm -rf overlay-all
 mkdir -p overlay-all
+
+echo "Copy run script"
+cp run.sh overlay-all/run.sh
 
 echo "Building srcs"
 MAKE="make -f Makefile-old-proto-repo"
 cd src
 
-echo "Build ss-10-*-all-cpu.riscv"
+#echo "Build ss-10-*-all-cpu.riscv"
+#$MAKE clean
+#$MAKE \
+#    proto-sha3-serialized-threads.riscv \
+#    proto-sha3-chained.riscv
+#
+#cp proto-sha3-serialized-threads.riscv ../overlay-all/ss-serial-all-cpu.riscv
+#cp proto-sha3-chained.riscv ../overlay-all/ss-chained-all-cpu.riscv
+
+echo "Build ss-*-all-accel.riscv"
+
 $MAKE clean
-$MAKE EXTRA_CXXFLAGS="${EXTRA_CXXFLAGS}" \
-    proto-sha3-serialized-threads.riscv \
-    proto-sha3-chained.riscv
+$MAKE EXTRA_CXXFLAGS="-DSHA3_ACCEL" \
+    proto-sha3-serialized-threads.riscv
+#    proto-sha3-chained.riscv
 
-cp proto-sha3-serialized-threads.riscv ../overlay-all/ss-10-serial-all-cpu.riscv
-cp proto-sha3-chained.riscv ../overlay-all/ss-10-chained-all-cpu.riscv
-
-echo "Build ss-10-*-all-accel.riscv"
-$MAKE clean
-#$MAKE EXTRA_CXXFLAGS="${EXTRA_CXXFLAGS} -DPROTO_ACCEL -DSHA3_ACCEL" \
-$MAKE EXTRA_CXXFLAGS="${EXTRA_CXXFLAGS} -DSHA3_ACCEL" \
-    proto-sha3-serialized-threads.riscv \
-    proto-sha3-chained.riscv
-
-cp proto-sha3-serialized-threads.riscv ../overlay-all/ss-10-serial-all-accel.riscv
-cp proto-sha3-chained.riscv ../overlay-all/ss-10-chained-all-accel.riscv
+cp proto-sha3-serialized-threads.riscv ../overlay-all/ss-serial-all-accel.riscv
+#cp proto-sha3-chained.riscv ../overlay-all/ss-chained-all-accel.riscv
 
 echo "Successful builds"
