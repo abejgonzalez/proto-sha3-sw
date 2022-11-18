@@ -7,6 +7,14 @@
   "cpus" : "3",
   "jobs" : [
     {
+      "name" : "ss-serial-all-cpu",
+      "command" : "./run.sh ./ss-serial-all-cpu.riscv"
+    },
+    {
+      "name" : "ss-chained-all-cpu",
+      "command" : "./run.sh ./ss-chained-all-cpu.riscv"
+    },
+    {
       "name" : "ss-serial-all-accel",
       "command" : "./run.sh ./ss-serial-all-accel.riscv"
     },

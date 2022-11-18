@@ -17,15 +17,17 @@
 // overall
 #include "utils.h"
 #include "encoding.h"
-#define NUM_ITERS 4
+#define NUM_ITERS 1000
 //#define PROTO_ACCEL
 //#define SHA3_ACCEL
 volatile char** volatile ser_out_str_ptrs;
 // make volatile to force whiles to not be opt.
 bool ser_inited = false;
 bool sha_finished = false;
-pthread_cond_t cond = PTHREAD_COND_INITIALIZER;
-pthread_mutex_t lock = PTHREAD_MUTEX_INITIALIZER;
+pthread_cond_t cond0 = PTHREAD_COND_INITIALIZER;
+pthread_cond_t cond1 = PTHREAD_COND_INITIALIZER;
+pthread_mutex_t lock0 = PTHREAD_MUTEX_INITIALIZER;
+pthread_mutex_t lock1 = PTHREAD_MUTEX_INITIALIZER;
 
 typedef struct pin_args {
     int cid;
@@ -71,11 +73,12 @@ void* op_core0(void* arg) {
 #endif
     setup_end = rdcycle();
 
-    pthread_mutex_lock(&lock);
+    pthread_mutex_lock(&lock0);
     ser_inited = true;
-    pthread_cond_signal(&cond);
-    pthread_mutex_unlock(&lock);
+    pthread_cond_signal(&cond0);
+    pthread_mutex_unlock(&lock0);
     printf("PRO: Passed cond signal\n");
+    printf("PRO: rdcycle: %ld\n", rdcycle());
 
     for (int i = 0; i < NUM_ITERS; i++){
         s_start[i] = rdcycle();
@@ -84,13 +87,15 @@ void* op_core0(void* arg) {
             DEBUG_PRINT("PRO: Pre: ser_out_str_ptrs[%d]:%p\n", j, ser_out_str_ptrs[j]);
         }
         DEBUG_PRINT("PRO: -> Proto serialize\n");
+        printf("PRO: -> Proto serialize %d\n", i);
 
         AccelSerializeToString(primitivetests, Paccser_boolMessage, proto_objs[i]);
 
         volatile char* str_ptr = BlockOnSerializedValue(ser_out_str_ptrs, i);
         DEBUG_PRINT("PRO: str_ptr[%d]:%p\n", i, str_ptr);
-        size_t str_len = GetSerializedLength(ser_out_str_ptrs, i);
-        DEBUG_PRINT("PRO: [%d] str_len:%d==%d\n", i, str_len, strlen((const char*)str_ptr));
+        printf("PRO: ser_out_str_ptrs[%d]:%p\n", i, ser_out_str_ptrs[i]);
+        //size_t str_len = GetSerializedLength(ser_out_str_ptrs, i);
+        //DEBUG_PRINT("PRO: [%d] str_len:%d==%d\n", i, str_len, strlen((const char*)str_ptr));
 
         for (int j = 0; j < NUM_ITERS; j++) {
             DEBUG_PRINT("PRO: Post: ser_out_str_ptrs[%d]:%p\n", j, ser_out_str_ptrs[j]);
@@ -130,15 +135,16 @@ void* op_core0(void* arg) {
     }
 
     google::protobuf::ShutdownProtobufLibrary();
+    printf("PRO: rdcycle: %ld\n", rdcycle());
 
     // Wait for SHA3 to finish before exiting out of this thread (to prevent mem. dealloc)
-    pthread_mutex_lock(&lock);
+    pthread_mutex_lock(&lock1);
     while (!sha_finished) {
     //    //printf("0: sha_finished:%d\n", sha_finished);
     //    //sleep(1);
-        pthread_cond_wait(&cond, &lock);
+        pthread_cond_wait(&cond1, &lock1);
     }
-    pthread_mutex_unlock(&lock);
+    pthread_mutex_unlock(&lock1);
 
     printf("PRO: Setup=%d\n", setup_end - setup_start);
     for (int i = 0; i < NUM_ITERS; i++) {
@@ -164,20 +170,23 @@ void* op_core1(void* arg) {
     unsigned long sha_mid[NUM_ITERS];
     unsigned long sha_end[NUM_ITERS];
 
-    pthread_mutex_lock(&lock);
+    pthread_mutex_lock(&lock0);
     while (!ser_inited) {
     //    printf("1: ser_inited:%d\n", ser_inited);
     //    sleep(1);
-        pthread_cond_wait(&cond, &lock);
+        pthread_cond_wait(&cond0, &lock0);
     }
-    pthread_mutex_unlock(&lock);
+    pthread_mutex_unlock(&lock0);
+    printf("SHA3: rdcycle: %ld\n", rdcycle());
     DEBUG_PRINT("SHA3: ser_out_str_ptrs:%p\n", ser_out_str_ptrs);
+    printf("SHA3: ser_out_str_ptrs:%p\n", ser_out_str_ptrs);
 
     for (int i = 0; i < NUM_ITERS; i++){
         sha_start[i] = rdcycle();
 
         // wait for ith iter of proto ser to finish
         while(ser_out_str_ptrs[i] == 0) {
+            //asm volatile ("");
             //for (int j = 0; j < NUM_ITERS; j++) {
             //    printf("1: ser_out_str_ptrs[%d]:%p\n", ser_out_str_ptrs[j]);
             //}
@@ -194,16 +203,16 @@ void* op_core1(void* arg) {
                 sha3_output[i]
                 );
         DEBUG_PRINT("SHA3: --> SHA3 hash\n");
+        printf("SHA3: -> SHA3 hash %d\n", i);
 
-        // Compute hash with accelerator
         asm volatile ("fence");
-        // Invoke the acclerator and check responses
 
-        // setup accelerator with addresses of input and output
+        // Setup accelerator with addresses of input and output
         ROCC_INSTRUCTION_SS(2, &ser_out_str_ptrs[i], &sha3_output[i], 0);
 
         // Set length and compute hash
         ROCC_INSTRUCTION_S(2, strlen((const char*)ser_out_str_ptrs[i]), 1);
+
         asm volatile ("fence" ::: "memory");
 
         for (int j = 0; j < SHA3_256_DIGEST_SIZE; j++) {
@@ -222,6 +231,7 @@ void* op_core1(void* arg) {
                 sha3_output[i]
                 );
         DEBUG_PRINT("SHA3: --> SHA3 hash\n");
+        printf("SHA3: -> SHA3 hash %d\n", i);
         sha3ONE((unsigned char*)ser_out_str_ptrs[i], strlen((const char*)ser_out_str_ptrs[i]), sha3_output[i]);
         for (int j = 0; j < SHA3_256_DIGEST_SIZE; j++) {
             DEBUG_PRINT("SHA3: sha3_output[%d][%d]:0x%x\n",
@@ -234,14 +244,16 @@ void* op_core1(void* arg) {
         sha_end[i] = rdcycle();
     }
 
-    pthread_mutex_lock(&lock);
+    pthread_mutex_lock(&lock1);
     sha_finished = true;
-    pthread_cond_signal(&cond);
-    pthread_mutex_unlock(&lock);
+    pthread_cond_signal(&cond1);
+    pthread_mutex_unlock(&lock1);
 
     for (int i = 0; i < NUM_ITERS; i++) {
         printf("SHA3: Iter %d: SHAFull=%d SHACore=%d\n", i, (sha_end[i] - sha_start[i]), (sha_end[i] - sha_mid[i]));
     }
+    printf("SHA3: First SHA counter: %ld\n", sha_start[0]);
+    printf("SHA3: First Mid SHA counter: %ld\n", sha_mid[0]);
     printf("SHA3: Last SHA counter: %ld\n", sha_end[NUM_ITERS - 1]);
 
     return 0;
@@ -266,8 +278,12 @@ int main(int argc, char* argv[]) {
         return 1;
     }
 
+    unsigned long o_start, o_end;
+
     int rc1, rc2;
     pthread_t tid0, tid1;
+
+    o_start = rdcycle();
 
     if(rc1=pthread_create(&tid0, NULL, &op_core0, &tid0_pin_args)) {
        DEBUG_PRINT("Thread 0 creation failed: %d\n", rc1);
@@ -279,6 +295,9 @@ int main(int argc, char* argv[]) {
 
     pthread_join(tid0, NULL);
     pthread_join(tid1, NULL);
+
+    o_end = rdcycle();
+    printf("Overall: %ld\n", o_end - o_start);
 
     DEBUG_PRINT("Success!\n\n");
 }

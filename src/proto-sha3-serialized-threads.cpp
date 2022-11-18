@@ -19,7 +19,7 @@
 // overall
 #include "utils.h"
 #include "encoding.h"
-#define NUM_ITERS 4
+#define NUM_ITERS 1000
 //#define PROTO_ACCEL
 //#define SHA3_ACCEL
 volatile char** volatile ser_out_str_ptrs;
@@ -41,12 +41,7 @@ void* op_core0(void* arg) {
     CHECK(verify_cpu_pinned(PROTO_CID));
     DEBUG_PRINT("PRO: Working on %d\n", PROTO_CID);
 
-    //pid_t tid;
-    //tid = syscall(SYS_gettid);
-    //DEBUG_PRINT("PRO: <><><><><>: %u\n:", pthread_self());
-    //DEBUG_PRINT("PRO: <><><><><>: %u\n:", tid);
-    //DEBUG_PRINT("PRO: <><><><><>: %u\n:", getpid());
-    //DEBUG_PRINT("PRO: <><><><><>: %u\n:", getppid());
+    DEBUG_PRINT("PRO: pthread_self: %u tid: %u pid: %u ppid: %u\n:", pthread_self(), syscall(SYS_gettid), getpid(), getppid());
 
     unsigned long setup_start, setup_end;
     unsigned long s_start[NUM_ITERS];
@@ -136,8 +131,8 @@ void* op_core0(void* arg) {
         }
         volatile char* str_ptr = BlockOnSerializedValue(ser_out_str_ptrs, i);
         DEBUG_PRINT("PRO: str_ptr[%d]:%p\n", i, str_ptr);
-        size_t str_len = GetSerializedLength(ser_out_str_ptrs, i);
-        DEBUG_PRINT("PRO: [%d] str_len:%d==%d\n", i, str_len, strlen((const char*)str_ptr));
+        //size_t str_len = GetSerializedLength(ser_out_str_ptrs, i);
+        //DEBUG_PRINT("PRO: [%d] str_len:%d==%d\n", i, str_len, strlen((const char*)str_ptr));
     }
 #endif
 
@@ -175,12 +170,7 @@ void* op_core1(void* arg) {
     CHECK(verify_cpu_pinned(SHA3_CID));
     DEBUG_PRINT("SHA3: Working on %d\n", SHA3_CID);
 
-    //pid_t tid;
-    //tid = syscall(SYS_gettid);
-    //DEBUG_PRINT("SHA3: <><><><><>: %u\n:", pthread_self());
-    //DEBUG_PRINT("SHA3: <><><><><>: %u\n:", tid);
-    //DEBUG_PRINT("SHA3: <><><><><>: %u\n:", getpid());
-    //DEBUG_PRINT("SHA3: <><><><><>: %u\n:", getppid());
+    DEBUG_PRINT("SHA3: pthread_self: %u tid: %u pid: %u ppid: %u\n:", pthread_self(), syscall(SYS_gettid), getpid(), getppid());
 
     // Setup SHA3 output
     unsigned char sha3_output[NUM_ITERS][SHA3_256_DIGEST_SIZE] __aligned(8);
@@ -198,9 +188,10 @@ void* op_core1(void* arg) {
     pthread_mutex_unlock(&lock);
     DEBUG_PRINT("SHA3: ser_out_str_ptrs:%p\n", ser_out_str_ptrs);
 
-    CHECK(verify_cpu_pinned(SHA3_CID));
+    //CHECK(verify_cpu_pinned(SHA3_CID));
 
 #ifdef SHA3_ACCEL
+    // Clear accelerator TLB
     DEBUG_PRINT("SHA3: Clear accel. TLB\n");
     asm volatile (".insn r CUSTOM_2, 0, 2, zero, zero, zero");
     DEBUG_PRINT("SHA3: Done clearing accel. TLB\n");
@@ -208,8 +199,6 @@ void* op_core1(void* arg) {
 
     for (int i = 0; i < NUM_ITERS; i++){
         sha_start[i] = rdcycle();
-
-        sha_mid[i] = rdcycle();
 #ifdef SHA3_ACCEL
         DEBUG_PRINT("SHA3: ser_out_str_ptrs[%d](.length,val):%d,%p sha3_output[%d]:%p\n",
                 i,
@@ -220,21 +209,15 @@ void* op_core1(void* arg) {
                 );
         DEBUG_PRINT("SHA3: --> SHA3 hash\n");
 
-        // Compute hash with accelerator
         asm volatile ("fence");
-        // Invoke the acclerator and check responses
 
-        DEBUG_PRINT("SHA3: --> CP0\n");
-
-        // setup accelerator with addresses of input and output
+        // Setup accelerator with addresses of input and output
         ROCC_INSTRUCTION_SS(2, &ser_out_str_ptrs[i], &sha3_output[i], 0);
-        DEBUG_PRINT("SHA3: --> CP1\n");
 
         // Set length and compute hash
         ROCC_INSTRUCTION_S(2, strlen((const char*)ser_out_str_ptrs[i]), 1);
-        DEBUG_PRINT("SHA3: --> CP2\n");
+
         asm volatile ("fence" ::: "memory");
-        DEBUG_PRINT("SHA3: --> CP3\n");
 
         for (int j = 0; j < SHA3_256_DIGEST_SIZE; j++) {
             DEBUG_PRINT("SHA3: sha3_output[%d][%d]:0x%x\n",
@@ -270,7 +253,7 @@ void* op_core1(void* arg) {
     pthread_mutex_unlock(&lock);
 
     for (int i = 0; i < NUM_ITERS; i++) {
-        printf("SHA3: Iter %d: SHAFull=%d SHACore=%d\n", i, (sha_end[i] - sha_start[i]), (sha_end[i] - sha_mid[i]));
+        printf("SHA3: Iter %d: SHAFull=%d\n", i, (sha_end[i] - sha_start[i]));
     }
     printf("SHA3: Last SHA counter: %ld\n", sha_end[NUM_ITERS - 1]);
 
@@ -280,11 +263,7 @@ void* op_core1(void* arg) {
 int main(int argc, char* argv[]) {
     DEBUG_PRINT("Starting test!\n\n");
 
-    //pid_t tid;
-    //tid = syscall(SYS_gettid);
-    //DEBUG_PRINT("1st: <><><><><>: %u\n:", tid);
-    //DEBUG_PRINT("1st: <><><><><>: %u\n:", getpid());
-    //DEBUG_PRINT("1st: <><><><><>: %u\n:", getppid());
+    DEBUG_PRINT("SHA3: tid: %u pid: %u ppid: %u\n:", syscall(SYS_gettid), getpid(), getppid());
 
     if (argc != 3) {
         fprintf(stderr, "invalid # args: %s PROTO_CID SHA3_CID\n", argv[0]);
@@ -302,8 +281,13 @@ int main(int argc, char* argv[]) {
         return 1;
     }
 
+    unsigned long o_start, o_end;
+
     int rc1, rc2;
     pthread_t tid0, tid1;
+
+
+    o_start = rdcycle();
 
     if(rc1=pthread_create(&tid0, NULL, &op_core0, &tid0_pin_args)) {
        DEBUG_PRINT("Thread 0 creation failed: %d\n", rc1);
@@ -315,6 +299,9 @@ int main(int argc, char* argv[]) {
 
     pthread_join(tid0, NULL);
     pthread_join(tid1, NULL);
+
+    o_end = rdcycle();
+    printf("Overall: %ld\n", o_end - o_start);
 
     DEBUG_PRINT("Success!\n\n");
 }
