@@ -4,6 +4,8 @@
 #include <unistd.h>
 #include <sys/mman.h>
 #include <string>
+#include <sys/syscall.h>
+#include <sys/types.h>
 
 // proto-specific
 #include "primitives.pb.h"
@@ -38,6 +40,13 @@ void* op_core0(void* arg) {
     CHECK(stick_this_thread_to_core(PROTO_CID));
     CHECK(verify_cpu_pinned(PROTO_CID));
     DEBUG_PRINT("PRO: Working on %d\n", PROTO_CID);
+
+    //pid_t tid;
+    //tid = syscall(SYS_gettid);
+    //DEBUG_PRINT("PRO: <><><><><>: %u\n:", pthread_self());
+    //DEBUG_PRINT("PRO: <><><><><>: %u\n:", tid);
+    //DEBUG_PRINT("PRO: <><><><><>: %u\n:", getpid());
+    //DEBUG_PRINT("PRO: <><><><><>: %u\n:", getppid());
 
     unsigned long setup_start, setup_end;
     unsigned long s_start[NUM_ITERS];
@@ -149,11 +158,11 @@ void* op_core0(void* arg) {
     }
     pthread_mutex_unlock(&lock);
 
-    DEBUG_PRINT("PRO: Setup=%d\n", setup_end - setup_start);
+    printf("PRO: Setup=%d\n", setup_end - setup_start);
     for (int i = 0; i < NUM_ITERS; i++) {
-        DEBUG_PRINT("PRO: Iter %d: Proto=%d\n", i, (s_end[i] - s_start[i]));
+        printf("PRO: Iter %d: Proto=%d\n", i, (s_end[i] - s_start[i]));
     }
-    DEBUG_PRINT("PRO: SetupStart=%ld\n", setup_start);
+    printf("PRO: SetupStart=%ld\n", setup_start);
 
     return 0;
 }
@@ -165,6 +174,13 @@ void* op_core1(void* arg) {
     CHECK(stick_this_thread_to_core(SHA3_CID));
     CHECK(verify_cpu_pinned(SHA3_CID));
     DEBUG_PRINT("SHA3: Working on %d\n", SHA3_CID);
+
+    //pid_t tid;
+    //tid = syscall(SYS_gettid);
+    //DEBUG_PRINT("SHA3: <><><><><>: %u\n:", pthread_self());
+    //DEBUG_PRINT("SHA3: <><><><><>: %u\n:", tid);
+    //DEBUG_PRINT("SHA3: <><><><><>: %u\n:", getpid());
+    //DEBUG_PRINT("SHA3: <><><><><>: %u\n:", getppid());
 
     // Setup SHA3 output
     unsigned char sha3_output[NUM_ITERS][SHA3_256_DIGEST_SIZE] __aligned(8);
@@ -185,7 +201,9 @@ void* op_core1(void* arg) {
     CHECK(verify_cpu_pinned(SHA3_CID));
 
 #ifdef SHA3_ACCEL
+    DEBUG_PRINT("SHA3: Clear accel. TLB\n");
     asm volatile (".insn r CUSTOM_2, 0, 2, zero, zero, zero");
+    DEBUG_PRINT("SHA3: Done clearing accel. TLB\n");
 #endif
 
     for (int i = 0; i < NUM_ITERS; i++){
@@ -252,15 +270,21 @@ void* op_core1(void* arg) {
     pthread_mutex_unlock(&lock);
 
     for (int i = 0; i < NUM_ITERS; i++) {
-        DEBUG_PRINT("SHA3: Iter %d: SHAFull=%d SHACore=%d\n", i, (sha_end[i] - sha_start[i]), (sha_end[i] - sha_mid[i]));
+        printf("SHA3: Iter %d: SHAFull=%d SHACore=%d\n", i, (sha_end[i] - sha_start[i]), (sha_end[i] - sha_mid[i]));
     }
-    DEBUG_PRINT("SHA3: Last SHA counter: %ld\n", sha_end[NUM_ITERS - 1]);
+    printf("SHA3: Last SHA counter: %ld\n", sha_end[NUM_ITERS - 1]);
 
     return 0;
 }
 
 int main(int argc, char* argv[]) {
     DEBUG_PRINT("Starting test!\n\n");
+
+    //pid_t tid;
+    //tid = syscall(SYS_gettid);
+    //DEBUG_PRINT("1st: <><><><><>: %u\n:", tid);
+    //DEBUG_PRINT("1st: <><><><><>: %u\n:", getpid());
+    //DEBUG_PRINT("1st: <><><><><>: %u\n:", getppid());
 
     if (argc != 3) {
         fprintf(stderr, "invalid # args: %s PROTO_CID SHA3_CID\n", argv[0]);

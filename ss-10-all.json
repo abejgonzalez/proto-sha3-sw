@@ -9,6 +9,10 @@
     {
       "name" : "ss-serial-all-accel",
       "command" : "./run.sh ./ss-serial-all-accel.riscv"
+    },
+    {
+      "name" : "ss-chained-all-accel",
+      "command" : "./run.sh ./ss-chained-all-accel.riscv"
     }
   ]
 }

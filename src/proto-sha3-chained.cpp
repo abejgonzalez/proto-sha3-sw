@@ -140,11 +140,11 @@ void* op_core0(void* arg) {
     }
     pthread_mutex_unlock(&lock);
 
-    DEBUG_PRINT("PRO: Setup=%d\n", setup_end - setup_start);
+    printf("PRO: Setup=%d\n", setup_end - setup_start);
     for (int i = 0; i < NUM_ITERS; i++) {
-        DEBUG_PRINT("PRO: Iter %d: Proto=%d\n", i, (s_end[i] - s_start[i]));
+        printf("PRO: Iter %d: Proto=%d\n", i, (s_end[i] - s_start[i]));
     }
-    DEBUG_PRINT("PRO: SetupStart=%ld\n", setup_start);
+    printf("PRO: SetupStart=%ld\n", setup_start);
 
     return 0;
 }
@@ -240,9 +240,9 @@ void* op_core1(void* arg) {
     pthread_mutex_unlock(&lock);
 
     for (int i = 0; i < NUM_ITERS; i++) {
-        DEBUG_PRINT("SHA3: Iter %d: SHAFull=%d SHACore=%d\n", i, (sha_end[i] - sha_start[i]), (sha_end[i] - sha_mid[i]));
+        printf("SHA3: Iter %d: SHAFull=%d SHACore=%d\n", i, (sha_end[i] - sha_start[i]), (sha_end[i] - sha_mid[i]));
     }
-    DEBUG_PRINT("SHA3: Last SHA counter: %ld\n", sha_end[NUM_ITERS - 1]);
+    printf("SHA3: Last SHA counter: %ld\n", sha_end[NUM_ITERS - 1]);
 
     return 0;
 }

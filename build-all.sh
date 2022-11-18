@@ -25,11 +25,11 @@ cd src
 echo "Build ss-*-all-accel.riscv"
 
 $MAKE clean
-$MAKE EXTRA_CXXFLAGS="-DSHA3_ACCEL" \
-    proto-sha3-serialized-threads.riscv
-#    proto-sha3-chained.riscv
+$MAKE EXTRA_CXXFLAGS="-DPROTO_ACCEL -DSHA3_ACCEL" \
+    proto-sha3-serialized-threads.riscv \
+    proto-sha3-chained.riscv
 
 cp proto-sha3-serialized-threads.riscv ../overlay-all/ss-serial-all-accel.riscv
-#cp proto-sha3-chained.riscv ../overlay-all/ss-chained-all-accel.riscv
+cp proto-sha3-chained.riscv ../overlay-all/ss-chained-all-accel.riscv
 
 echo "Successful builds"
