@@ -24,9 +24,9 @@ P1_HID=$(echo "$HLINES" | head -n2 | tail -n1)
 P1_HID=${P1_HID:0-1}
 echo "$P1_CID $P1_HID"
 
-P2_CID=$(echo "$PLINES" | tail -n1)
+P2_CID=$(echo "$PLINES" | head -n3 | tail -n1)
 P2_CID=${P2_CID:0-1}
-P2_HID=$(echo "$HLINES" | tail -n1)
+P2_HID=$(echo "$HLINES" | head -n3 | tail -n1)
 P2_HID=${P2_HID:0-1}
 echo "$P2_CID $P2_HID"
 

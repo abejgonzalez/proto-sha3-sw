@@ -1,0 +1,10 @@
+{
+  "name" : "ss-chained-all-accel",
+  "base" : "br-base.json",
+  "workdir" : ".",
+  "overlay" : "overlay-all-hyper",
+  "host-init" : "build-all-hyper.sh",
+  "cpus" : "3",
+  "name" : "ss-chained-all-accel",
+  "command" : "./run.sh ./ss-chained-all-accel.riscv"
+}

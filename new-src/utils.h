@@ -32,7 +32,7 @@ int verify_cpu_pinned(int core_id) {
         DEBUG_PRINT("getcpu failed for cid:%d check with rc=%d\n", core_id, rc);
         return rc;
     }
-    DEBUG_PRINT("cpu=%d core_id=%d is_equal=%d\n", cpu, core_id, cpu == core_id);
+    //DEBUG_PRINT("cpu=%d core_id=%d is_equal=%d\n", cpu, core_id, cpu == core_id);
     return cpu != core_id;
 }
 
