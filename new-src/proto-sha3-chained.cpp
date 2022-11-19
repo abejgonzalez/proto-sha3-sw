@@ -22,16 +22,19 @@ namespace hyperprotobench {
 // overall
 #include "utils.h"
 #include "encoding.h"
-#define NUM_ITERS 50
+#define NUM_ITERS 10
+#define NUM_DUPS 50
 //#define PROTO_ACCEL
 //#define SHA3_ACCEL
 volatile char** volatile ser_out_str_ptrs;
 // make volatile to force whiles to not be opt.
-volatile bool ser_inited = false;
-volatile bool sha_finished = false;
+//volatile bool ser_inited = false;
+//volatile bool sha_finished = false;
+std::atomic<bool> sha_finished(false);
 std::atomic<int> done_up_to(-1);
 //pthread_mutex_t lock0 = PTHREAD_MUTEX_INITIALIZER;
 //pthread_mutex_t lock1 = PTHREAD_MUTEX_INITIALIZER;
+#define ns_diff_s(x,y) (std::chrono::duration_cast<std::chrono::nanoseconds>((x) - (y)).count())
 
 typedef struct pin_args {
     int cid;
@@ -45,12 +48,14 @@ void* op_core0(void* arg) {
     CHECK(verify_cpu_pinned(PROTO_CID));
     //DEBUG_PRINT("PRO: Working on %d\n", PROTO_CID);
 
-    unsigned long accel_setup_start, accel_setup_end;
-    unsigned long s_start[NUM_ITERS];
-    unsigned long s_end[NUM_ITERS];
-    unsigned long setup_proto_start;
+    //unsigned long accel_setup_start, accel_setup_end;
+    //unsigned long s_start[NUM_ITERS];
+    //unsigned long s_end[NUM_ITERS];
+    //unsigned long setup_proto_start;
+    unsigned long s_end_to_start[NUM_ITERS];
 
-    setup_proto_start = rdcycle();
+    //setup_proto_start = rdcycle();
+    auto setup_proto_start = std::chrono::steady_clock::now();
 
     // Setup proto objs
     google::protobuf::Arena arena;
@@ -60,7 +65,8 @@ void* op_core0(void* arg) {
         M52_Set_F1(proto_objs[i], NULL, NULL);
     }
 
-    accel_setup_start = rdcycle();
+    //accel_setup_start = rdcycle();
+    auto accel_setup_start = std::chrono::steady_clock::now();
 #ifdef PROTO_ACCEL
     // Setup str, and strptr memory regions (also touches all pages to avoid accel. pg. faults)
     ser_out_str_ptrs = AccelSetupSerializer();
@@ -74,30 +80,32 @@ void* op_core0(void* arg) {
 
     //DEBUG_PRINT("PRO: CPUInit: ser_out_str_ptrs:%p cpu_out_str_ptrs:%p\n", ser_out_str_ptrs, &cpu_out_str_ptrs);
 #endif
-    accel_setup_end = rdcycle();
+    //accel_setup_end = rdcycle();
+    auto accel_setup_end = std::chrono::steady_clock::now();
 
     //pthread_mutex_lock(&lock0);
-    ser_inited = true;
+    //ser_inited = true;
     //pthread_mutex_unlock(&lock0);
     //printf("PRO: Passed cond signal\n");
     //printf("PRO: rdcycle: %ld\n", rdcycle());
 
     for (int i = 0; i < NUM_ITERS; i++){
-        s_start[i] = rdcycle();
+        //s_start[i] = rdcycle();
+        auto s_start = std::chrono::steady_clock::now();
 #ifdef PROTO_ACCEL
         //for (int j = 0; j < NUM_ITERS; j++) {
         //    DEBUG_PRINT("PRO: Pre: ser_out_str_ptrs[%d]:%p\n", j, ser_out_str_ptrs[j]);
         //}
         //DEBUG_PRINT("PRO: -> Proto serialize\n");
-        printf("PRO: -> Proto serialize %d\n", i);
+        //printf("PRO: -> Proto serialize %d\n", i);
 
         AccelSerializeToString(hyperprotobench, M52, proto_objs[i]);
 
-        printf("PRO: -> Done serialize %d\n", i);
+        //printf("PRO: -> Done serialize %d\n", i);
 
         volatile char* str_ptr = BlockOnSerializedValue(ser_out_str_ptrs, i);
-        done_up_to.store(i);
-        printf("PRO: -> Done block %d\n", i);
+        done_up_to.store(i, std::memory_order_release);
+        //printf("PRO: -> Done block %d\n", i);
         //DEBUG_PRINT("PRO: str_ptr[%d]:%p\n", i, str_ptr);
         //printf("PRO: ser_out_str_ptrs[%d]:%p\n", i, ser_out_str_ptrs[i]);
         //size_t str_len = GetSerializedLength(ser_out_str_ptrs, i);
@@ -137,26 +145,45 @@ void* op_core0(void* arg) {
         //    DEBUG_PRINT("PRO: ser_out_str_ptrs[%d]:%p cpu_out_str_ptrs[%d]:%p\n", j, ser_out_str_ptrs[j], j, cpu_out_str_ptrs[j]);
         //}
 #endif
-        s_end[i] = rdcycle();
+        //s_end[i] = rdcycle();
+        auto s_end = std::chrono::steady_clock::now();
+        s_end_to_start[i] = ns_diff_s(s_end, s_start);
     }
+    auto s_end_i = std::chrono::steady_clock::now();
 
     //printf("PRO: rdcycle: %ld\n", rdcycle());
 
     // Wait for SHA3 to finish before exiting out of this thread (to prevent mem. dealloc)
     //pthread_mutex_lock(&lock1);
-    while (!sha_finished) {
+    while (!sha_finished.load(std::memory_order_acquire)) {
     //    //printf("0: sha_finished:%d\n", sha_finished);
     //    //sleep(1);
     }
     //pthread_mutex_unlock(&lock1);
 
+    //unsigned long print_start, print_end;
+    //print_start = rdcycle();
+    //printf("PRO: ProtoObjSetup=%lu\n", accel_setup_start - setup_proto_start);
+    //printf("PRO: AccelSetup=%lu\n", accel_setup_end - accel_setup_start);
+    //for (int i = 0; i < NUM_ITERS; i++) {
+    //    printf("PRO: Iter %d: IterSerTime=%lu\n", i, (s_end[i] - s_start[i]));
+    //}
+    //printf("PRO: ProtoThreadOverall: %lu\n", s_end[NUM_ITERS - 1] - setup_proto_start);
+    //print_end = rdcycle();
+    //printf("PRO: P=%lu\n", print_end - print_start);
 
-    printf("PRO: ProtoObjSetup=%lu\n", accel_setup_start - setup_proto_start);
-    printf("PRO: AccelSetup=%lu\n", accel_setup_end - accel_setup_start);
+    auto print_start = std::chrono::steady_clock::now();
+    printf("PRO: ProtoObjSetup=%lu\n", ns_diff_s(accel_setup_start, setup_proto_start));
+    printf("PRO: AccelSetup=%lu\n", ns_diff_s(accel_setup_end, accel_setup_start));
     for (int i = 0; i < NUM_ITERS; i++) {
-        printf("PRO: Iter %d: IterSerTime=%lu\n", i, (s_end[i] - s_start[i]));
+        //printf("PRO: Iter %lu: IterSerTime=%lu\n", i, (s_end[i] - s_start[i]));
+        printf("PRO: Iter %lu: IterSerTime=%lu\n", i, s_end_to_start[i]);
     }
-    printf("PRO: ProtoThreadOverall: %lu\n", s_end[NUM_ITERS - 1] - setup_proto_start);
+    //printf("PRO: BlockedTime=%lu\n", ns_diff_s(block_c, s_end_i));
+    printf("PRO: ProtoThreadOverall=%lu\n", ns_diff_s(s_end_i, setup_proto_start));
+    //print_end = rdcycle();
+    auto print_end = std::chrono::steady_clock::now();
+    printf("PRO: P=%lu\n", ns_diff_s(print_end, print_start));
 
     google::protobuf::ShutdownProtobufLibrary();
 
@@ -174,13 +201,16 @@ void* op_core1(void* arg) {
     // Setup SHA3 output
     unsigned char sha3_output[NUM_ITERS][SHA3_256_DIGEST_SIZE] __aligned(8);
 
-    unsigned long sha_start[NUM_ITERS];
-    unsigned long sha_mid[NUM_ITERS];
-    unsigned long sha_mid2[NUM_ITERS];
-    unsigned long sha_end[NUM_ITERS];
-    unsigned long start_thread;
+    ///unsigned long sha_start[NUM_ITERS];
+    ///unsigned long sha_mid[NUM_ITERS];
+    ///unsigned long sha_mid2[NUM_ITERS];
+    ///unsigned long sha_end[NUM_ITERS];
+    ///unsigned long start_thread;
+    unsigned long sha_end_to_mid[NUM_ITERS];
+    unsigned long sha_mid_to_start[NUM_ITERS];
 
-    start_thread = rdcycle();
+    //start_thread = rdcycle();
+    auto start_thread = std::chrono::steady_clock::now();
 
     //pthread_mutex_lock(&lock0);
     //while (!ser_inited) {
@@ -188,91 +218,122 @@ void* op_core1(void* arg) {
     ////    sleep(1);
     //}
     //pthread_mutex_unlock(&lock0);
-    printf("SHA3: Start\n");
+    //printf("SHA3: Start\n");
     //DEBUG_PRINT("SHA3: ser_out_str_ptrs:%p\n", ser_out_str_ptrs);
     //printf("SHA3: ser_out_str_ptrs:%p\n", ser_out_str_ptrs);
 
+#ifdef SHA3_ACCEL
+    // Clear accelerator TLB
+    //DEBUG_PRINT("SHA3: Clear accel. TLB\n");
+    asm volatile (".insn r CUSTOM_2, 0, 2, zero, zero, zero");
+    //DEBUG_PRINT("SHA3: Done clearing accel. TLB\n");
+#endif
+    auto sha_start_0 = std::chrono::steady_clock::now();
+
     for (int i = 0; i < NUM_ITERS; i++){
-        sha_start[i] = rdcycle();
+        //sha_start[i] = rdcycle();
+        auto sha_start = std::chrono::steady_clock::now();
 
         // wait for ith iter of proto ser to finish
-        while(done_up_to.load() < i) {
+        while(done_up_to.load(std::memory_order_acquire) < i) {
             asm volatile ("");
             //for (int j = 0; j < NUM_ITERS; j++) {
             //    printf("1: ser_out_str_ptrs[%d]:%p\n", ser_out_str_ptrs[j]);
             //}
             //sleep(1);
-            printf("SHA3: Wait %d < %d\n", done_up_to.load(), i);
+            //printf("SHA3: Wait %d < %d\n", done_up_to.load(std::memory_order_acquire), i);
         }
-        printf("SHA3: -> Ready to hash: %d ... %d\n", i, done_up_to.load());
+        //printf("SHA3: -> Ready to hash: %d ... %d\n", i, done_up_to.load(std::memory_order_acquire));
 
-        sha_mid[i] = rdcycle();
+        //sha_mid[i] = rdcycle();
+        auto sha_mid = std::chrono::steady_clock::now();
+        if (ser_out_str_ptrs[i] != NULL) {
 #ifdef SHA3_ACCEL
-        //printf("SHA3: ser_out_str_ptrs[%d](.length,val):%d,%p sha3_output[%d]:%p\n",
-        //        i,
-        //        strlen((const char*)ser_out_str_ptrs[i]),
-        //        ser_out_str_ptrs[i],
-        //        i,
-        //        sha3_output[i]
-        //        );
-        ////DEBUG_PRINT("SHA3: --> SHA3 hash\n");
-        printf("SHA3: -> SHA3 hash setup: %d\n", i);
+            //printf("SHA3: ser_out_str_ptrs[%d](.length,val):%d,%p sha3_output[%d]:%p\n",
+            //        i,
+            //        strlen((const char*)ser_out_str_ptrs[i]),
+            //        ser_out_str_ptrs[i],
+            //        i,
+            //        sha3_output[i]
+            //        );
+            ////DEBUG_PRINT("SHA3: --> SHA3 hash\n");
+            //printf("SHA3: -> SHA3 hash setup: %d\n", i);
 
-        asm volatile ("fence");
+            asm volatile ("fence");
 
-        // Setup accelerator with addresses of input and output
-        ROCC_INSTRUCTION_SS(2, &ser_out_str_ptrs[i], &sha3_output[i], 0);
-#endif
+            // Setup accelerator with addresses of input and output
+            ROCC_INSTRUCTION_SS(2, &ser_out_str_ptrs[i], &sha3_output[i], 0);
 
-        printf("SHA3: -> SHA3 hash: %d\n", i);
-        sha_mid2[i] = rdcycle();
+            // Set length and compute hash
+            ROCC_INSTRUCTION_S(2, strlen((const char*)ser_out_str_ptrs[i]), 1);
 
-#ifdef SHA3_ACCEL
-        // Set length and compute hash
-        ROCC_INSTRUCTION_S(2, strlen((const char*)ser_out_str_ptrs[i]), 1);
+            asm volatile ("fence" ::: "memory");
 
-        asm volatile ("fence" ::: "memory");
-
-        //for (int j = 0; j < SHA3_256_DIGEST_SIZE; j++) {
-        //    DEBUG_PRINT("SHA3: sha3_output[%d][%d]:0x%x\n",
-        //            i,
-        //            j,
-        //            sha3_output[i][j]
-        //            );
-        //}
+            //for (int j = 0; j < SHA3_256_DIGEST_SIZE; j++) {
+            //    DEBUG_PRINT("SHA3: sha3_output[%d][%d]:0x%x\n",
+            //            i,
+            //            j,
+            //            sha3_output[i][j]
+            //            );
+            //}
 #else
-        //DEBUG_PRINT("SHA3: ser_out_str_ptrs[%d](.length,val):%d,%p sha3_output[%d]:%p\n",
-        //        i,
-        //        strlen((const char*)ser_out_str_ptrs[i]),
-        //        ser_out_str_ptrs[i],
-        //        i,
-        //        sha3_output[i]
-        //        );
-        //DEBUG_PRINT("SHA3: --> SHA3 hash\n");
-        //printf("SHA3: -> SHA3 hash %d\n", i);
-        sha3ONE((unsigned char*)ser_out_str_ptrs[i], strlen((const char*)ser_out_str_ptrs[i]), sha3_output[i]);
-        //for (int j = 0; j < SHA3_256_DIGEST_SIZE; j++) {
-        //    DEBUG_PRINT("SHA3: sha3_output[%d][%d]:0x%x\n",
-        //            i,
-        //            j,
-        //            sha3_output[i][j]
-        //            );
-        //}
+            //DEBUG_PRINT("SHA3: ser_out_str_ptrs[%d](.length,val):%d,%p sha3_output[%d]:%p\n",
+            //        i,
+            //        strlen((const char*)ser_out_str_ptrs[i]),
+            //        ser_out_str_ptrs[i],
+            //        i,
+            //        sha3_output[i]
+            //        );
+            //DEBUG_PRINT("SHA3: --> SHA3 hash\n");
+            //printf("SHA3: -> SHA3 hash %d\n", i);
+            sha3ONE((unsigned char*)ser_out_str_ptrs[i], strlen((const char*)ser_out_str_ptrs[i]), sha3_output[i]);
+            //for (int j = 0; j < SHA3_256_DIGEST_SIZE; j++) {
+            //    DEBUG_PRINT("SHA3: sha3_output[%d][%d]:0x%x\n",
+            //            i,
+            //            j,
+            //            sha3_output[i][j]
+            //            );
+            //}
 #endif
-        printf("SHA3: -> SHA3 complete hash: %d\n", i);
+            //printf("SHA3: -> SHA3 complete hash: %d\n", i);
+        } else {
+            printf("SHA3: Skipped %d\n", i);
+        }
 
-        sha_end[i] = rdcycle();
+        //sha_end[i] = rdcycle();
+        auto sha_end = std::chrono::steady_clock::now();
+        sha_end_to_mid[i] = ns_diff_s(sha_end, sha_mid);
+        sha_mid_to_start[i] = ns_diff_s(sha_mid, sha_start);
     }
+
+    auto sha_end_i = std::chrono::steady_clock::now();
 
     //pthread_mutex_lock(&lock1);
-    sha_finished = true;
+    sha_finished.store(true, std::memory_order_release);
     //pthread_mutex_unlock(&lock1);
 
+    //unsigned long print_start, print_end;
+    //print_start = rdcycle();
+    //for (int i = 0; i < NUM_ITERS; i++) {
+    //    printf("SHA3: Iter %d: SHAFull=%lu SHACore=%lu SHASetup=%lu\n", i, (sha_end[i] - sha_start[i]), (sha_end[i] - sha_mid[i]), (sha_mid2[i] - sha_mid[i]));
+    //}
+    //printf("SHA3: LoopCycles: %lu\n", sha_end[NUM_ITERS - 1] - sha_start[0]);
+    //printf("SHA3: OverallThreadCycles: %lu\n", sha_end[NUM_ITERS - 1] - start_thread);
+    //print_end = rdcycle();
+    //printf("SHA3: P=%lu\n", print_end - print_start);
+
+    auto print_start = std::chrono::steady_clock::now();
     for (int i = 0; i < NUM_ITERS; i++) {
-        printf("SHA3: Iter %d: SHAFull=%lu SHACore=%lu SHASetup=%lu\n", i, (sha_end[i] - sha_start[i]), (sha_end[i] - sha_mid[i]), (sha_mid2[i] - sha_mid[i]));
+        //printf("SHA3: Iter %d: SHAFull=%lu SHACore=%lu SHASetup=%lu\n", i, (sha_end[i] - sha_start[i]), (sha_end[i] - sha_mid[i]), (sha_mid[i] - sha_start[i]));
+        printf("SHA3: Iter %d: SHACore=%lu SHAWait=%lu\n", i, sha_end_to_mid[i], sha_mid_to_start[i]);
     }
-    printf("SHA3: LoopCycles: %lu\n", sha_end[NUM_ITERS - 1] - sha_start[0]);
-    printf("SHA3: OverallThreadCycles: %lu\n", sha_end[NUM_ITERS - 1] - start_thread);
+    printf("SHA3: LoopCycles: %lu\n", ns_diff_s(sha_end_i, sha_start_0));
+    printf("SHA3: OverallThreadCycles: %lu\n", ns_diff_s(sha_end_i, start_thread));
+    //print_end = rdcycle();
+    auto print_end = std::chrono::steady_clock::now();
+    printf("SHA3: P=%lu\n", ns_diff_s(print_end, print_start));
+
+
 
     return 0;
 }
@@ -296,26 +357,41 @@ int main(int argc, char* argv[]) {
         return 1;
     }
 
-    unsigned long o_start, o_end;
+    //unsigned long o_start[NUM_DUPS];
+    //unsigned long o_end[NUM_DUPS];
+    unsigned long ns_diff[NUM_DUPS];
 
     int rc1, rc2;
     pthread_t tid0, tid1;
 
-    o_start = rdcycle();
+    for (int i = 0; i < NUM_DUPS; i++) {
+        printf("Dup Itr: %d\n", i);
+        //o_start[i] = rdcycle();
+        auto oo_start = std::chrono::steady_clock::now();
 
-    if(rc1=pthread_create(&tid0, NULL, &op_core0, &tid0_pin_args)) {
-       DEBUG_PRINT("Thread 0 creation failed: %d\n", rc1);
+        sha_finished.store(false);
+        done_up_to.store(-1);
+
+        if(rc1=pthread_create(&tid0, NULL, &op_core0, &tid0_pin_args)) {
+            DEBUG_PRINT("Thread 0 creation failed: %d\n", rc1);
+        }
+
+        if(rc2=pthread_create(&tid1, NULL, &op_core1, &tid1_pin_args)) {
+            DEBUG_PRINT("Thread 1 creation failed: %d\n", rc2);
+        }
+
+        pthread_join(tid0, NULL);
+        pthread_join(tid1, NULL);
+
+        //o_end[i] = rdcycle();
+        auto oo_end = std::chrono::steady_clock::now();
+        ns_diff[i] = ns_diff_s(oo_end, oo_start);
     }
 
-    if(rc2=pthread_create(&tid1, NULL, &op_core1, &tid1_pin_args)) {
-       DEBUG_PRINT("Thread 1 creation failed: %d\n", rc2);
+    for (int i = 0; i < NUM_DUPS; i++) {
+        //printf("Overall[%d]: %lu = %lu - %lu\n", i, o_end[i] - o_start[i], o_end[i], o_start[i]);
+        printf("Overall[%d]: %lu\n", i, ns_diff[i]);
     }
-
-    pthread_join(tid0, NULL);
-    pthread_join(tid1, NULL);
-
-    o_end = rdcycle();
-    printf("Overall: %lu=%lu - %lu\n", o_end - o_start, o_end, o_start);
 
     DEBUG_PRINT("Success!\n\n");
 }

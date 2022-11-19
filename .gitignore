@@ -2,3 +2,5 @@
 overlay*/
 *.pid
 *.riscv
+dump
+.*.swo
