@@ -53,4 +53,4 @@ if [ $P2_HID -eq "1" ]; then
 fi
 
 echo "Running $TO_RUN with {Proto, SHA3} CID's: {$PROTO_CID, $SHA3_CID}"
-$TO_RUN $PROTO_CID $SHA3_CID
+$TO_RUN

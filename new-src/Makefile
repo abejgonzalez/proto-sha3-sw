@@ -7,7 +7,7 @@ ROOT_DIR:=$(shell dirname $(realpath $(firstword $(MAKEFILE_LIST))))
 
 CXXFLAGS=-std=c++11 -O3 -g3 -static -pthread $(EXTRA_CXXFLAGS)
 
-HYPERSCALE_REPO=$(ROOT_DIR)/../../firesim-protoacc-ae/target-design/chipyard
+HYPERSCALE_REPO=$(ROOT_DIR)/../../hyperscale-soc-chipyard/
 
 ########## PROTO ##########
 
@@ -30,7 +30,7 @@ PROTO_LIB_HDR_DIR = $(PROTO_ACC_DIR)/microbenchmarks/protobuf-riscv-install/incl
 ########## SHA ##########
 
 SHA_DIR=$(HYPERSCALE_REPO)/generators/sha3
-SHA_SW_DIR=$(SHA_DIR)/software/benchmarks/src
+SHA_SW_DIR=$(SHA_DIR)/software/tests/src
 
 SHA_CXX_HDRS = \
 	$(SHA_SW_DIR)/compiler.h \
@@ -56,14 +56,12 @@ SHA_HDR_DIRS += $(sort $(foreach filename,$(SHA_CXX_HDRS),$(dir $(filename))))
 ROCC_HDR_DIRS += $(sort $(foreach filename,$(ROCC_CXX_HDRS),$(dir $(filename))))
 MISC_HDR_DIRS += $(sort $(foreach filename,$(MISC_CXX_HDRS),$(dir $(filename))))
 CXXFLAGS += \
-	$(foreach dirname,$(PROTO_HDR_DIRS),-I $(dirname)) \
-	$(foreach dirname,$(SHA_HDR_DIRS),-I $(dirname)) \
 	$(foreach dirname,$(ROCC_HDR_DIRS),-I $(dirname)) \
 	$(foreach dirname,$(MISC_HDR_DIRS),-I $(dirname)) \
 	-I $(PROTO_LIB_HDR_DIR)
 
 #TESTS=multithreaded-test proto-sha3-serialized proto-sha3-serialized-2 proto-sha3-chained
-TESTS=proto-sha3-serialized-threads proto-sha3-chained
+TESTS=proto-sha3-chained
 COMPILED_TESTS=$(addsuffix .riscv,$(TESTS))
 
 default: $(COMPILED_TESTS)
