@@ -68,7 +68,7 @@ default: $(COMPILED_TESTS)
 
 #%.riscv: %.cpp $(PROTO_CXX_ALL) $(SHA_CXX_ALL) $(ROCC_CXX_HDRS)
 %.riscv: %.cpp
-	$(CXX) $(CXXFLAGS) $< $(PROTO_CXX_SRCS) $(PROTO_LIB) -pthread -o $@
+	$(CXX) $(CXXFLAGS) $< $(PROTO_LIB) -pthread -o $@
 
 clean:
 	rm -rf $(COMPILED_TESTS)
