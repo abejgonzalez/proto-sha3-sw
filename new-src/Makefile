@@ -7,7 +7,7 @@ ROOT_DIR:=$(shell dirname $(realpath $(firstword $(MAKEFILE_LIST))))
 
 CXXFLAGS=-std=c++11 -O3 -g3 -static -pthread $(EXTRA_CXXFLAGS)
 
-HYPERSCALE_REPO=$(ROOT_DIR)/../../firesim-protoacc-ae/target-design/chipyard
+HYPERSCALE_REPO=$(ROOT_DIR)/../../../target-design/chipyard
 
 ########## PROTO ##########
 
