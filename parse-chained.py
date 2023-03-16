@@ -4,7 +4,7 @@ import sys
 import re
 
 uartlog = sys.argv[1]
-print(f"Running on {uartlog}")
+print(f"Parsing {uartlog}...")
 
 def avg(l):
     l = list(l)
@@ -19,20 +19,12 @@ with open(uartlog) as f:
             itr = int(m.group(1))
             dup_iteration_lines[itr] = [l]
             cur_itr = itr
-            #print(f"Set {itr}")
         else:
             if cur_itr == -1:
                 continue
             else:
                 old_lines = dup_iteration_lines[cur_itr]
-                #print(f"{cur_itr} {old_lines}")
                 dup_iteration_lines[cur_itr] = old_lines + [l]
-                #print(f"{cur_itr} {dup_iteration_lines[cur_itr]}")
-
-#for k in dup_iteration_lines:
-#    print(f"DupItrLines: {k}")
-#    for i in dup_iteration_lines[k]:
-#        print(i)
 
 dup_iterations = {}
 
@@ -43,9 +35,6 @@ for l in dup_iteration_lines[k]:
     if m:
         overall_dup_cycles[int(m.group(1))] = int(m.group(2))
         continue
-
-#print(overall_dup_cycles)
-#sys.exit(1)
 
 for k in dup_iteration_lines:
     lines = dup_iteration_lines[k]
@@ -108,69 +97,17 @@ for k in dup_iteration_lines:
     assert bool(proto_itr_cycles)
     assert not proto_thread_overall == -1
 
-    # NEEDED
-
-    #cpu_proto_t_sub_i = sum(proto_itr_cycles.values())
-    #cpu_sha3_t_sub_i = sum(sha3_full_cycles.values())
-    #print(f"{overall_dup_cycles[k]} - {cpu_proto_t_sub_i} - {cpu_sha3_t_sub_i}")
-    #cpu_other_non_accel_t_sub_i = overall_dup_cycles[k] - cpu_proto_t_sub_i - cpu_sha3_t_sub_i
-
-    #acc_proto_t_sub_i = sum(proto_itr_cycles.values()) + proto_blocked_time
-    #acc_proto_t_setup_i = proto_accel_setup
-
-    #acc_sha3_t_sub_i = sum(sha3_core_cycles.values())
-    #acc_sha3_t_setup_i = sha3_pretlb_start + sum(sha3_setup_cycles.values())
-
     overall_dup_c = overall_dup_cycles[k]
 
-    # NEEDED
-
     dup_iterations[k] = [
-        #cpu_proto_t_sub_i,
-        #cpu_sha3_t_sub_i,
-        #cpu_other_non_accel_t_sub_i,
-
-        #acc_proto_t_sub_i,
-        #acc_proto_t_setup_i,
-
-        #acc_sha3_t_sub_i,
-        #acc_sha3_t_setup_i,
-
         overall_dup_c,
     ]
-
-#cpu_proto_t_sub_i = []
-#cpu_sha3_t_sub_i = []
-#cpu_other_non_accel_t_sub_i = []
-#
-#acc_proto_t_sub_i = []
-#acc_proto_t_setup_i = []
-#
-#acc_sha3_t_sub_i = []
-#acc_sha3_t_setup_i = []
 
 overall_dup_c_i = []
 
 for k, e in dup_iterations.items():
-    #cpu_proto_t_sub_i += [e[0]]
-    #cpu_sha3_t_sub_i += [e[1]]
-    #cpu_other_non_accel_t_sub_i += [e[2]]
-
-    #acc_proto_t_sub_i += [e[3]]
-    #acc_proto_t_setup_i += [e[4]]
-
-    #acc_sha3_t_sub_i += [e[5]]
-    #acc_sha3_t_setup_i += [e[6]]
-
     overall_dup_c_i += [e[0]]
 
-#print(f"cpu_proto_t_sub_i = {avg(cpu_proto_t_sub_i)}")
-#print(f"cpu_sha3_t_sub_i = {avg(cpu_sha3_t_sub_i)}")
-#print(f"cpu_other_non_accel_t_sub_i = {avg(cpu_other_non_accel_t_sub_i)}")
-#print(f"acc_proto_t_sub_i   = {avg(acc_proto_t_sub_i)}")
-#print(f"acc_proto_t_setup_i = {avg(acc_proto_t_setup_i)}")
-#print(f"acc_sha3_t_sub_i    = {avg(acc_sha3_t_sub_i)}")
-#print(f"acc_sha3_t_setup_i  = {avg(acc_sha3_t_setup_i)}")
-print(f"overall_dup_c_i = {avg(overall_dup_c_i)}")
-print(f"overall_dup_c_i = {min(overall_dup_c_i)}")
-print(f"overall_dup_c_i = {max(overall_dup_c_i)}")
+print(f"Avg. t'_e2e = {avg(overall_dup_c_i)}")
+print(f"Min. t'_e2e = {min(overall_dup_c_i)}")
+print(f"Max. t'_e2e = {max(overall_dup_c_i)}")
